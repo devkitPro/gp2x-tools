@@ -95,6 +95,10 @@ int main(int argc, char* argv[]) {
 
       numberOfSections++;
       sections = realloc(sections, sizeof(struct Section)*numberOfSections);
+      if(sections == NULL) {
+	fprintf(stderr, "Error allocating memory while reading section options\n");
+	return 1;
+      }
 
       strcpy(sections[numberOfSections-1].file, filename);
       sections[numberOfSections-1].loadAddress = loadAddress;

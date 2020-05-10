@@ -179,27 +179,33 @@ int main(int argc, char* argv[]) {
 }
 
 int setIcon(O2xHeader* header, bool isSet, char* filename) {
-  FILE* iconFile = fopen(filename, "rb");
-  if(iconFile == NULL) {
-    fprintf(stderr, "Could not open icon file\n");
-    return 1;
-  }
+  if(isSet) {
+    FILE* iconFile = fopen(filename, "rb");
+    if(iconFile == NULL) {
+      fprintf(stderr, "Could not open icon file\n");
+      return 1;
+    }
 
-  fseek(iconFile, 0L, SEEK_END);
-  int size = ftell(iconFile);
-  if(size != 512) {
-    fprintf(stderr, "Icon file should be 512 bytes, was %d\n", size);
+    fseek(iconFile, 0L, SEEK_END);
+    int size = ftell(iconFile);
+    if(size != 512) {
+      fprintf(stderr, "Icon file should be 512 bytes, was %d\n", size);
+      fclose(iconFile);
+    }
+    rewind(iconFile);
+
+    if(fread(header->icon, sizeof(uint16_t), 16*16, iconFile) != (16*16)) {
+      fprintf(stderr, "Could not read icon file\n");
+      fclose(iconFile);
+      return 1;
+    }
+
     fclose(iconFile);
+  } else {
+    for(int i = 0 ; i < 16*16 ; i++) {
+      header->icon[i] = 0xF81F; // magneta
+    }
   }
-  rewind(iconFile);
-
-  if(fread(header->icon, sizeof(uint16_t), 16*16, iconFile) != (16*16)) {
-    fprintf(stderr, "Could not read icon file\n");
-    fclose(iconFile);
-    return 1;
-  }
-
-  fclose(iconFile);
   return 0;
 }
 

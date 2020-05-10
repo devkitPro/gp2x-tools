@@ -134,16 +134,19 @@ int main(int argc, char* argv[]) {
 
   if(!nameSpecified) {
     fprintf(stderr, "Name must be specified\n");
+    usage();
     return 1;
   }
 
   if(numberOfSections < 1) {
     fprintf(stderr, "At least one section be specified\n");
+    usage();
     return 1;
   }
 
   if(!outputSpecified) {
     fprintf(stderr, "Output file must be specified\n");
+    usage();
     return 1;
   }  
   

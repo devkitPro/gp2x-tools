@@ -10,3 +10,10 @@ depcomp
 install-sh
 ltmain.sh
 missing
+.deps
+Makefile
+*.log
+*.status
+*~
+*.o
+mko2x

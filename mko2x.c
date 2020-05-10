@@ -25,18 +25,6 @@ typedef struct {
   uint8_t numberOfSections;
 } O2xHeader;
 
-
-// TODO
-// mandatory name
-// optional icon (fill with magenta if not given)
-// optional param max length - default 0
-// optional param address - default 0
-// mandatory at least one section
-// mandatory output filename
-
-//https://stackoverflow.com/questions/15466782/parsing-command-line-options-with-multiple-arguments-getopt/15467257
-//https://www.gnu.org/software/libc/manual/html_node/Getopt-Long-Option-Example.html
-
 struct Section {
   char file[ARG_MAX];
   uint32_t loadAddress;

@@ -6,7 +6,9 @@
 #include <string.h>
 #include <limits.h>
 
+#ifndef ARG_MAX
 #define ARG_MAX 65536
+#endif
 
 #define O2X_MAGIC 0x3178326F
 
@@ -28,6 +30,8 @@ typedef struct {
 struct Section {
   char file[ARG_MAX];
   uint32_t loadAddress;
+  int length;
+  void* data;
 };
 
 void usage();
@@ -41,7 +45,7 @@ int main(int argc, char* argv[]) {
     {"icon", required_argument, 0, 'i'},
     {"section", required_argument, 0, 's'},
     {"out", required_argument, 0, 'o'},
-    {"params", required_argument, 0, 'p'},
+    {"params", optional_argument, 0, 'p'},
     {"help", no_argument, 0, 'h'},
     {0, 0, 0, 0}
   };
@@ -63,6 +67,7 @@ int main(int argc, char* argv[]) {
 
   uint32_t paramsLength = 0;
   uint32_t paramsAddr = 0;
+  bool paramsSpecified = false;
   
   int option_index = 0;
   int c = 0;
@@ -100,11 +105,40 @@ int main(int argc, char* argv[]) {
 	return 1;
       }
 
+      FILE* fp = fopen(filename, "rb");
+      if(fp == NULL) {
+	fprintf(stderr, "Could not open '%s'\n", filename);
+	return 1;
+      }
+
+      fseek(fp, 0L, SEEK_END);
+      int length = ftell(fp);
+      rewind(fp);
+
+      void* buf = malloc(length);
+      if(buf == NULL) {
+	fprintf(stderr, "Could not allocate enough memory to read file\n");
+	fclose(fp);
+	return 1;
+      }
+
+      if(fread(buf, sizeof(uint8_t), length, fp) != length) {
+	fprintf(stderr, "Could not read contents of file into memory\n");
+	fclose(fp);
+	free(buf);
+	return 1;
+      }
+
+      fclose(fp);
+    
       strcpy(sections[numberOfSections-1].file, filename);
       sections[numberOfSections-1].loadAddress = loadAddress;
+      sections[numberOfSections-1].length = length;
+      sections[numberOfSections-1].data = buf;
       break;
 
     case 'p':
+      paramsSpecified = true;
       paramsAddr = strtoul(optarg, NULL, 0);
       if (optind < argc && *argv[optind] != '-') {
 	paramsLength = strtoul(argv[optind], NULL, 0);
@@ -152,12 +186,34 @@ int main(int argc, char* argv[]) {
     fprintf(stderr, "Output file must be specified\n");
     usage();
     return 1;
-  }  
+  }
   
   FILE* outFile = fopen(outputPath, "wb");
   if(outFile == NULL) {
     fprintf(stderr, "Could not open file for writing\n");
     return 1;
+  }
+
+  if(!paramsSpecified) {
+    // No explicit params address given, store them after first section (i.e. start of heap)
+    uint32_t* section0Data = sections[0].data;
+    int section0Length = sections[0].length;
+    int i = 0;
+    while(i < section0Length) {
+      if(*section0Data == 0xdeadbeef) {
+	break;
+      }
+      section0Data++;
+      i += 4;
+    }
+
+    if((i+8) >= section0Length) {
+      fprintf(stderr, "No params address/length specified, and couldn't find them in binary file\n");
+      return 1;
+    }
+
+    paramsAddr = *(++section0Data);
+    paramsLength = *(++section0Data);
   }
 
   O2xHeader header;
@@ -215,41 +271,16 @@ int setIcon(O2xHeader* header, bool isSet, char* filename) {
 
 int writeSections(FILE* outFile, int n, struct Section* sections)  {
   for(int i = 0 ; i < n ; i++) {
-    FILE* fp = fopen(sections[i].file, "rb");
-    if(fp == NULL) {
-      fprintf(stderr, "Could not open '%s'\n", sections[i].file);
-      return 1;
-    }
-
-    fseek(fp, 0L, SEEK_END);
-    int length = ftell(fp);
-    rewind(fp);
-
-    void* buf = malloc(length);
-    if(buf == NULL) {
-      fprintf(stderr, "Could not allocate enough memory to read file\n");
-      fclose(fp);
-      return 1;
-    }
-
-    if(fread(buf, sizeof(uint8_t), length, fp) != length) {
-      fprintf(stderr, "Could not read contents of file into memory\n");
-      fclose(fp);
-      free(buf);
-      return 1;
-    }
-
-    fclose(fp);
-
+    int length = sections[i].length;
     O2xSection sectionHdr = {
       length,
       sections[i].loadAddress
     };
 
     fwrite((void*) &sectionHdr, sizeof(O2xSection), 1, outFile);
-    fwrite(buf, sizeof(uint8_t), length, outFile);
+    fwrite(sections[i].data, sizeof(uint8_t), length, outFile);
 
-    free(buf);
+    free(sections[i].data);
   }
   return 0;
 }
